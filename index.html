@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第二课堂｜抖音内容分析台</title>
+<style>
+:root{font-family:system-ui,"Microsoft YaHei",sans-serif;color:#e9eefb;background:#0e1422}*{box-sizing:border-box}body{margin:0}main{max-width:1180px;margin:auto;padding:24px}h1{margin:0 0 8px;font-size:28px}p,.muted{color:#a4afc3}header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px}.panel,.metric{background:#192338;border:1px solid #32415c;border-radius:16px;padding:18px}section{margin:18px 0}.actions{display:flex;flex-wrap:wrap;gap:10px}button,.button,select,input{border:1px solid #465978;border-radius:9px;background:#24324b;color:white;padding:10px 13px;font:inherit}button,.button{cursor:pointer}button.primary,.button.primary{background:#456ff0;border-color:#456ff0}button:hover{filter:brightness(1.13)}input[type=file]{max-width:270px}.metrics,.cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric strong{display:block;font-size:27px;margin:8px 0}.metric span{color:#a4afc3;font-size:13px}.cols{grid-template-columns:1fr 1fr}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:15px}.toolbar input{flex:1;min-width:170px}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;border-bottom:1px solid #34435d;padding:11px 8px}th{color:#bdc8df}td.num{text-align:right}.scroll{overflow:auto}.bar{height:11px;border-radius:6px;background:#34425e;margin-top:7px}.fill{height:100%;border-radius:6px;background:#7197ff}li{margin:9px 0}small{color:#9daac0}@media(max-width:750px){.metrics{grid-template-columns:1fr 1fr}.cols{grid-template-columns:1fr}main{padding:14px}h1{font-size:24px}}@media(max-width:440px){.metrics{grid-template-columns:1fr 1fr}.metric strong{font-size:22px}}
+</style></head><body><main>
+<header><div><h1>第二课堂 · 抖音数据分析台</h1><p>v1.0 · 作品表现、内容分类、选题复盘</p></div><div class="muted" id="status">数据仅保存在当前浏览器</div></header>
+<section class="panel"><div class="actions">
+<label class="button primary" for="file">导入 CSV 文件</label><input id="file" type="file" accept=".csv,text/csv" hidden>
+<button id="template">下载 CSV 模板</button><button id="export">导出当前数据</button><button id="clear">清空数据</button>
+</div><p>建议填写：发布时间、标题、类型、播放量、点赞、评论、收藏、分享。支持 Excel 另存为 UTF-8 CSV；同一标题与日期的记录会更新而不重复导入。</p></section>
+<section class="metrics"><div class="metric"><span>作品总数</span><strong id="count">0</strong></div><div class="metric"><span>总播放量</span><strong id="views">0</strong></div><div class="metric"><span>平均播放量</span><strong id="avg">0</strong></div><div class="metric"><span>互动率（互动数/播放量）</span><strong id="engagement">0%</strong></div></section>
+<section class="panel"><div class="toolbar"><input id="search" placeholder="搜索视频标题"><select id="type"><option value="">全部内容类型</option></select><input id="start" type="date" aria-label="起始日期"><input id="end" type="date" aria-label="结束日期"></div><small>所有统计依据筛选后的作品计算；互动数=点赞+评论+收藏+分享。</small></section>
+<section class="cols"><div class="panel"><h2>内容类型对比</h2><div id="categories" class="muted">导入数据后显示</div></div><div class="panel"><h2>内容复盘建议</h2><div id="insights" class="muted">导入数据后，根据播放表现生成提示。</div></div></section>
+<section class="panel"><h2>作品表现排行</h2><div class="scroll"><table><thead><tr><th>日期</th><th>标题</th><th>类型</th><th>播放量</th><th>点赞</th><th>互动率</th></tr></thead><tbody id="rows"><tr><td colspan="6">暂无作品数据</td></tr></tbody></table></div></section>
+<section class="panel"><h2>使用说明</h2><p>下载 CSV 模板并填写真实数据，再导入即可。当前版本不会自动连接抖音后台，浏览器清理本地网站数据可能导致记录丢失，请定期点击「导出当前数据」备份。公开仓库不要提交含有账号、手机号或其他敏感信息的 CSV。</p></section>
+</main><script>
+(()=>{
+"use strict";
+const KEY="second-classroom-douyin-v1",fields=["发布时间","标题","类型","播放量","点赞","评论","收藏","分享"];
+const $=id=>document.getElementById(id),number=x=>Math.max(0,Number(String(x??"").replace(/[,，\s]/g,""))||0);
+const fmt=n=>Math.round(n).toLocaleString("zh-CN"),pct=n=>(n*100).toFixed(2)+"%";
+let data=[];try{const raw=JSON.parse(localStorage.getItem(KEY)||"[]");if(Array.isArray(raw))data=raw}catch{}
+function csvParse(t){const rows=[];let row=[],cell="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(c==='"'){if(q&&t[i+1]==='"'){cell+='"';i++}else q=!q}else if(c===","&&!q){row.push(cell);cell=""}else if((c==="\n"||c==="\r")&&!q){if(c==="\r"&&t[i+1]==="\n")i++;row.push(cell);if(row.some(x=>x.trim()))rows.push(row);row=[];cell=""}else cell+=c}row.push(cell);if(row.some(x=>x.trim()))rows.push(row);return rows}
+function csvString(rows){return "\uFEFF"+rows.map(r=>r.map(v=>{const s=String(v??"");return /[,"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(",")).join("\r\n")}
+function download(name,text){const url=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
+function clean(v){return {发布时间:String(v["发布时间"]||"").slice(0,10),标题:String(v["标题"]||"").trim(),类型:String(v["类型"]||"未分类").trim()||"未分类",播放量:number(v["播放量"]),点赞:number(v["点赞"]),评论:number(v["评论"]),收藏:number(v["收藏"]),分享:number(v["分享"])}}
+function saved(){try{localStorage.setItem(KEY,JSON.stringify(data));$("status").textContent="已保存在当前浏览器 · "+data.length+" 条"}catch{$("status").textContent="保存失败，请导出备份"}}
+function metric(d){const plays=d.reduce((a,v)=>a+v.播放量,0),eng=d.reduce((a,v)=>a+v.点赞+v.评论+v.收藏+v.分享,0);return {plays,avg:d.length?plays/d.length:0,rate:plays?eng/plays:0}}
+function element(tag,txt){const e=document.createElement(tag);e.textContent=String(txt);return e}
+function draw(){const types=[...new Set(data.map(x=>x.类型))].sort(),selected=$("type").value;$("type").replaceChildren(new Option("全部内容类型",""),...types.map(x=>new Option(x,x)));$("type").value=types.includes(selected)?selected:"";
+const query=$("search").value.trim().toLowerCase(),start=$("start").value,end=$("end").value,type=$("type").value;
+const d=data.filter(x=>(!query||x.标题.toLowerCase().includes(query))&&(!type||x.类型===type)&&(!start||x.发布时间>=start)&&(!end||x.发布时间<=end));
+const m=metric(d);$("count").textContent=fmt(d.length);$("views").textContent=fmt(m.plays);$("avg").textContent=fmt(m.avg);$("engagement").textContent=pct(m.rate);
+const grouped=[...new Set(d.map(x=>x.类型))].map(name=>{const items=d.filter(x=>x.类型===name);return{name,count:items.length,...metric(items)}}).sort((a,b)=>b.avg-a.avg),max=Math.max(1,...grouped.map(x=>x.avg));
+$("categories").replaceChildren(...(grouped.length?grouped.map(g=>{const box=element("div",g.name+" · "+g.count+" 条 · 平均 "+fmt(g.avg)+" 播放");box.style.marginBottom="18px";const bar=element("div","");bar.className="bar";const fill=element("div","");fill.className="fill";fill.style.width=Math.max(0,g.avg/max*100)+"%";bar.append(fill);box.append(bar);return box}):[element("p","暂无作品数据")]));
+const insights=[];if(d.length){if(grouped.length){const best=grouped.find(x=>x.count>=3);insights.push(best?"样本不少于 3 条的类别中，“"+best.name+"”平均播放量最高（"+fmt(best.avg)+"）。":"各类别不足 3 条，建议先积累样本，暂不判断哪类更好。")}const top=[...d].sort((a,b)=>b.播放量-a.播放量)[0];insights.push("当前最高播放作品：“"+top.标题+"”（"+fmt(top.播放量)+" 次播放）。");insights.push("播放量与互动率是不同指标，建议同时查看，避免只凭单条爆款决定选题。")}else insights.push("导入真实作品数据后自动生成建议。");
+const ul=document.createElement("ul");insights.forEach(x=>ul.append(element("li",x)));$("insights").replaceChildren(ul);
+$("rows").replaceChildren(...(d.length?[...d].sort((a,b)=>b.播放量-a.播放量).map(x=>{const tr=document.createElement("tr");[x.发布时间,x.标题,x.类型,fmt(x.播放量),fmt(x.点赞),pct(x.播放量?(x.点赞+x.评论+x.收藏+x.分享)/x.播放量:0)].forEach(v=>tr.append(element("td",v)));return tr}):[(()=>{const tr=document.createElement("tr"),td=element("td","暂无符合条件的数据");td.colSpan=6;tr.append(td);return tr})()]));}
+$("file").addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;try{const rows=csvParse((await file.text()).replace(/^\uFEFF/,""));if(!rows.length)throw Error("文件为空");const header=rows.shift().map(x=>x.trim());if(!fields.every(x=>header.includes(x)))throw Error("缺少必要列："+fields.filter(x=>!header.includes(x)).join("、"));let added=0;for(const row of rows){const raw=Object.fromEntries(header.map((h,i)=>[h,row[i]||""])),x=clean(raw);if(!x.标题||!x.发布时间)continue;const idx=data.findIndex(v=>v.标题===x.标题&&v.发布时间===x.发布时间);if(idx<0){data.push(x);added++}else data[idx]=x}saved();draw();alert("导入完成：新增 "+added+" 条，共 "+data.length+" 条。")}catch(err){alert("导入失败："+err.message)}e.target.value=""});
+$("template").onclick=()=>download("抖音作品数据模板.csv",csvString([fields,["2026-10-19","示例标题（请删除）","数据图",1000,40,8,5,2]]));
+$("export").onclick=()=>download("第二课堂抖音数据备份.csv",csvString([fields,...data.map(x=>fields.map(k=>x[k]))]));
+$("clear").onclick=()=>{if(confirm("确认清空本浏览器中的所有作品数据？此操作无法撤销。")){data=[];saved();draw()}};
+["search","type","start","end"].forEach(id=>$(id).addEventListener(id==="search"?"input":"change",draw));saved();draw();
+})();
+</script></body></html>
